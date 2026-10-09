@@ -48,6 +48,11 @@ LEAK_CAP_MB = int(os.getenv("LEAK_CAP_MB", "2048"))
 # --------------------------------------------------------------------------- #
 # Logging
 # --------------------------------------------------------------------------- #
+# Structured fields are passed as flat `extra={...}` keys (not a nested dict):
+# the OTLP log exporter drops dict-valued attributes, flat scalars survive.
+_STD_LOG_ATTRS = set(logging.makeLogRecord({}).__dict__) | {"message", "asctime", "taskName"}
+
+
 class JsonFormatter(logging.Formatter):
     def __init__(self, service: str):
         super().__init__()
@@ -65,9 +70,9 @@ class JsonFormatter(logging.Formatter):
         if ctx.is_valid:
             payload["trace_id"] = format(ctx.trace_id, "032x")
             payload["span_id"] = format(ctx.span_id, "016x")
-        fields = getattr(record, "fields", None)
-        if fields:
-            payload.update(fields)
+        for key, value in record.__dict__.items():  # flat `extra=` attributes
+            if key not in _STD_LOG_ATTRS and not key.startswith("_") and key not in payload:
+                payload[key] = value
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload, default=str)
@@ -227,7 +232,9 @@ class Db:
 # Fault state
 # --------------------------------------------------------------------------- #
 class FaultState:
-    def __init__(self, service: str, base_version: str, db: Optional[Db], logger: logging.Logger):
+    def __init__(self, service: str, base_version: str, db: Optional[Db], logger: logging.Logger,
+                 state_file: Optional[str] = None):
+        self.state_file = state_file
         self.service = service
         self.base_version = base_version
         self.version = base_version
@@ -237,6 +244,31 @@ class FaultState:
         self._active: Dict[str, Dict[str, Any]] = {}
         self._leak: list = []
         self._requests_seen = 0
+
+    # Faults survive a container restart (like a real defect would), so a crash
+    # fault produces a crash *loop* and a leak keeps leaking after an OOM-kill.
+    def _persist(self) -> None:
+        if not self.state_file:
+            return
+        try:
+            with open(self.state_file, "w") as fh:
+                json.dump({k: {a: b for a, b in v.items() if a != "since"} for k, v in self.snapshot().items()}, fh)
+        except OSError:
+            pass
+
+    def restore(self) -> None:
+        if not self.state_file or not os.path.exists(self.state_file):
+            return
+        try:
+            with open(self.state_file) as fh:
+                saved = json.load(fh)
+        except (OSError, ValueError):
+            return
+        for ftype, params in saved.items():
+            try:
+                self.apply(ftype, params)
+            except ValueError:
+                pass
 
     def apply(self, ftype: str, params: Dict[str, Any]) -> None:
         if ftype not in FAULT_TYPES:
@@ -251,11 +283,11 @@ class FaultState:
         if ftype == "bad_deploy":
             self.version = str(params.get("version", "v2.0.0-bad"))
             self.log.warning(
-                "deployment rolled out", extra={"fields": {"event": "deploy", "version": self.version}}
+                "deployment rolled out", extra={"event": "deploy", "version": self.version}
             )
-        self.log.warning(
-            "fault activated", extra={"fields": {"event": "fault_activated", "fault": ftype}}
-        )
+        # Debug only: the investigator must never be handed the injected fault's name.
+        self.log.debug("fault state changed", extra={"event": "fault_state_changed"})
+        self._persist()
 
     def clear(self, ftype: Optional[str] = None) -> None:
         with self._lock:
@@ -268,7 +300,27 @@ class FaultState:
             self.db.release_held()
         if ftype in (None, "bad_deploy"):
             self.version = self.base_version
-        self.log.info("fault cleared", extra={"fields": {"event": "fault_cleared", "fault": ftype or "all"}})
+        self.log.debug("fault state changed", extra={"event": "fault_state_changed"})
+        self._persist()
+
+    # Remediation actions the Fixer agent may request (verified in a sandbox first).
+    # Each maps to the runtime fault it neutralises; the demo's faults stand in for
+    # real underlying causes, so "rollback" etc. are the operator-level actions.
+    REMEDIATIONS = {
+        "rollback_deploy": "bad_deploy",
+        "reset_db_pool": "db_pool_exhaustion",
+        "restart_service": "memory_leak",
+        "hotfix_crash": "crash",
+        "clear_error_source": "error",
+        "failover_dependency": "latency",
+    }
+
+    def remediate(self, action: str) -> str:
+        if action not in self.REMEDIATIONS:
+            raise ValueError(f"unknown remediation '{action}'")
+        self.clear(self.REMEDIATIONS[action])
+        self.log.warning(f"remediation applied: {action}", extra={"event": "remediation", "action": action})
+        return self.REMEDIATIONS[action]
 
     def snapshot(self) -> Dict[str, Dict[str, Any]]:
         with self._lock:
@@ -317,13 +369,17 @@ def make_app(service: str, use_db: bool = False) -> SimpleNamespace:
     db = Db(os.environ["DATABASE_URL"], maxconn=int(os.getenv("DB_POOL_SIZE", "5"))) if use_db else None
     resource = setup_telemetry(service, version, endpoint, db)
     logger = setup_logging(service, resource, endpoint)
-    faults = FaultState(service, version, db, logger)
+    faults = FaultState(
+        service, version, db, logger,
+        state_file=os.getenv("FAULT_STATE_FILE", f"/tmp/{service}_faults.json"),
+    )
+    faults.restore()
 
     app = FastAPI(title=service)
 
     @app.exception_handler(PoolExhausted)
     async def _pool_exhausted(_req: Request, exc: PoolExhausted):
-        logger.error(str(exc), extra={"fields": {"event": "db_pool_exhausted"}})
+        logger.error(str(exc), extra={"event": "db_pool_exhausted"})
         return JSONResponse({"detail": "database unavailable"}, status_code=503)
 
     @app.middleware("http")
@@ -337,15 +393,15 @@ def make_app(service: str, use_db: bool = False) -> SimpleNamespace:
         status = faults.error_status()
         if status:
             logger.error(
-                f"request failed: injected {status} on {request.method} {path}",
-                extra={"fields": {"event": "request_error", "status": status, "version": faults.version}},
+                f"request failed with {status} on {request.method} {path}",
+                extra={"event": "request_error", "status": status, "version": faults.version},
             )
             resp = JSONResponse({"detail": "internal error"}, status_code=status)
             resp.headers["x-service-version"] = faults.version
             return resp
         faults.leak_step()
         if faults.should_crash():
-            logger.critical("fatal: unrecoverable state, exiting", extra={"fields": {"event": "crash"}})
+            logger.critical("fatal: unrecoverable state, exiting", extra={"event": "crash"})
             for handler in logging.getLogger().handlers:
                 handler.flush()
             os._exit(1)
@@ -374,9 +430,19 @@ def make_app(service: str, use_db: bool = False) -> SimpleNamespace:
         faults.clear(type)
         return {"service": service, "active": faults.snapshot()}
 
+    @app.post("/admin/remediate")
+    def remediate(body: Dict[str, Any]):
+        try:
+            cleared = faults.remediate(str(body.get("action")))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"service": service, "cleared": cleared, "active": faults.snapshot()}
+
     # Instrument last so the span wraps the fault middleware: injected latency
     # and errors then appear in traces exactly like real ones would.
     FastAPIInstrumentor.instrument_app(app)
+
+    logger.info("service started", extra={"event": "service_started", "version": version})
 
     timeout = float(os.getenv("UPSTREAM_TIMEOUT", "3"))
 
@@ -390,7 +456,7 @@ def make_app(service: str, use_db: bool = False) -> SimpleNamespace:
         except requests.RequestException as exc:
             logger.error(
                 f"upstream call to {name} failed: {exc}",
-                extra={"fields": {"event": "upstream_error", "upstream": name, "url": url}},
+                extra={"event": "upstream_error", "upstream": name, "url": url},
             )
             raise HTTPException(status_code=502, detail=f"{name} unavailable")
 

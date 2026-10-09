@@ -6,3 +6,8 @@ __pycache__/
 data/telemetry/*
 !data/telemetry/.gitkeep
 eval/ground_truth.jsonl
+node_modules/
+dashboard/dist/
+rootcause.db
+data/sandbox-telemetry/
+.venv-*/

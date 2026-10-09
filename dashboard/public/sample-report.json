@@ -1,0 +1,837 @@
+{
+ "window": {
+  "start_ns": 1760000150000000000,
+  "end_ns": 1760000250000000000,
+  "baseline_start_ns": 1760000030000000000
+ },
+ "anomalies": [
+  {
+   "service": "gateway",
+   "onset_ns": 1760000150000000000,
+   "anomalous_buckets": 18,
+   "total_buckets": 20,
+   "severity": 0.0169,
+   "deviating": {
+    "error_rate": {
+     "baseline": 0.0,
+     "worst": 1.0
+    },
+    "p95_ms": {
+     "baseline": 74.101,
+     "worst": 3002.0
+    }
+   }
+  },
+  {
+   "service": "notifications",
+   "onset_ns": 1760000150000000000,
+   "anomalous_buckets": 18,
+   "total_buckets": 20,
+   "severity": 0.1166,
+   "deviating": {
+    "p95_ms": {
+     "baseline": 9.447,
+     "worst": 4009.854
+    },
+    "self_p95_ms": {
+     "baseline": 9.447,
+     "worst": 4009.854
+    },
+    "inbound_fail": {
+     "baseline": 0.0,
+     "worst": 1.0
+    },
+    "inbound_p95_ms": {
+     "baseline": 11.446,
+     "worst": 3000.0
+    }
+   }
+  },
+  {
+   "service": "orders",
+   "onset_ns": 1760000150000000000,
+   "anomalous_buckets": 18,
+   "total_buckets": 20,
+   "severity": 0.072,
+   "deviating": {
+    "p95_ms": {
+     "baseline": 70.345,
+     "worst": 3062.028
+    },
+    "inbound_fail": {
+     "baseline": 0.0,
+     "worst": 1.0
+    },
+    "inbound_p95_ms": {
+     "baseline": 72.345,
+     "worst": 3000.0
+    }
+   }
+  }
+ ],
+ "graph": {
+  "nodes": [
+   {
+    "id": "gateway",
+    "anomalous": true,
+    "starved": false
+   },
+   {
+    "id": "inventory",
+    "anomalous": false,
+    "starved": false
+   },
+   {
+    "id": "notifications",
+    "anomalous": true,
+    "starved": false
+   },
+   {
+    "id": "orders",
+    "anomalous": true,
+    "starved": false
+   },
+   {
+    "id": "payments",
+    "anomalous": false,
+    "starved": false
+   }
+  ],
+  "edges": [
+   {
+    "caller": "gateway",
+    "callee": "orders",
+    "calls": 444,
+    "errors": 392,
+    "error_rate": 0.8829,
+    "p95_ms": 3000.0
+   },
+   {
+    "caller": "orders",
+    "callee": "inventory",
+    "calls": 444,
+    "errors": 0,
+    "error_rate": 0.0,
+    "p95_ms": 13.6
+   },
+   {
+    "caller": "orders",
+    "callee": "payments",
+    "calls": 444,
+    "errors": 0,
+    "error_rate": 0.0,
+    "p95_ms": 36.1
+   },
+   {
+    "caller": "orders",
+    "callee": "notifications",
+    "calls": 444,
+    "errors": 392,
+    "error_rate": 0.8829,
+    "p95_ms": 3000.0
+   },
+   {
+    "caller": "gateway",
+    "callee": "inventory",
+    "calls": 72,
+    "errors": 0,
+    "error_rate": 0.0,
+    "p95_ms": 13.6
+   }
+  ]
+ },
+ "root_candidates": [
+  "notifications"
+ ],
+ "propagation_path": [
+  "notifications",
+  "orders",
+  "gateway"
+ ],
+ "hypotheses": [
+  {
+   "service": "notifications",
+   "fault_type": "latency",
+   "score": 5,
+   "confidence": 1.0,
+   "status": "supported",
+   "rejected_because": null,
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "notifications",
+     "summary": "notifications is the deepest anomalous service on the call path",
+     "ts_ns": null,
+     "ref": "graph:root_candidate",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "span",
+     "service": "notifications",
+     "summary": "notifications spends 4010 ms p95 inside itself (baseline 10 ms), excluding time waiting on downstream calls",
+     "ts_ns": 1760000212950962176,
+     "ref": "trace:de034ee0c7d562951ce1a700b0758f94/span:a844972acd8a9ef9",
+     "supports": true,
+     "weight": 3,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "notifications",
+     "summary": "callers see notifications responses at 3000 ms p95 (baseline 12 ms)",
+     "ts_ns": null,
+     "ref": "stat:notifications.inbound_p95",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    }
+   ]
+  },
+  {
+   "service": "gateway",
+   "fault_type": "error",
+   "score": -2,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "392 of 392 error logs in gateway are failed calls to orders: the errors are propagated from orders, not generated here",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "gateway",
+     "summary": "gateway's anomaly can be explained by its downstream dependency orders",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "span",
+     "service": "gateway",
+     "summary": "gateway fails 76% of its requests (baseline 0%)",
+     "ts_ns": 1760000150144686336,
+     "ref": "trace:14924dda339ffa424436cdb06f962839/span:9533631b89aabd83",
+     "supports": true,
+     "weight": 3,
+     "decisive": false
+    },
+    {
+     "kind": "log",
+     "service": "gateway",
+     "summary": "392 of 392 error logs in gateway are failed calls to orders: the errors are propagated from orders, not generated here",
+     "ts_ns": 1760000153145686272,
+     "ref": "log:2",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "notifications",
+   "fault_type": "error",
+   "score": -2,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "notifications error rate is only 0%",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "notifications",
+     "summary": "notifications is the deepest anomalous service on the call path",
+     "ts_ns": null,
+     "ref": "graph:root_candidate",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "notifications",
+     "summary": "notifications error rate is only 0%",
+     "ts_ns": null,
+     "ref": "stat:notifications.err_rate",
+     "supports": false,
+     "weight": 3,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "notifications",
+   "fault_type": "crash",
+   "score": -3,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "notifications never restarted, logged nothing fatal and refused no connections",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "notifications",
+     "summary": "notifications is the deepest anomalous service on the call path",
+     "ts_ns": null,
+     "ref": "graph:root_candidate",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "notifications",
+     "summary": "notifications never restarted, logged nothing fatal and refused no connections",
+     "ts_ns": null,
+     "ref": "stat:notifications.no_crash",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "notifications",
+   "fault_type": "memory_leak",
+   "score": -3,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "notifications RSS stayed flat (peak 71 MB vs baseline 70 MB)",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "notifications",
+     "summary": "notifications is the deepest anomalous service on the call path",
+     "ts_ns": null,
+     "ref": "graph:root_candidate",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "metric",
+     "service": "notifications",
+     "summary": "notifications RSS stayed flat (peak 71 MB vs baseline 70 MB)",
+     "ts_ns": null,
+     "ref": "metric:process.memory.rss@notifications",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "notifications",
+   "fault_type": "bad_deploy",
+   "score": -3,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "no deployment event recorded for notifications near the incident",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "notifications",
+     "summary": "notifications is the deepest anomalous service on the call path",
+     "ts_ns": null,
+     "ref": "graph:root_candidate",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "notifications",
+     "summary": "no deployment event recorded for notifications near the incident",
+     "ts_ns": null,
+     "ref": "stat:notifications.no_deploy",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "orders",
+   "fault_type": "latency",
+   "score": -3,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "orders's own processing time is normal (16 ms p95, baseline 16 ms); its time is spent waiting on notifications (mean 2650 ms vs baseline 9 ms)",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "orders",
+     "summary": "orders's anomaly can be explained by its downstream dependency notifications",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "orders",
+     "summary": "orders's own processing time is normal (16 ms p95, baseline 16 ms); its time is spent waiting on notifications (mean 2650 ms vs baseline 9 ms)",
+     "ts_ns": null,
+     "ref": "stat:orders.self_p95",
+     "supports": false,
+     "weight": 3,
+     "decisive": true
+    },
+    {
+     "kind": "stat",
+     "service": "orders",
+     "summary": "callers see orders responses at 3000 ms p95 (baseline 73 ms)",
+     "ts_ns": null,
+     "ref": "stat:orders.inbound_p95",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    }
+   ]
+  },
+  {
+   "service": "gateway",
+   "fault_type": "latency",
+   "score": -4,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "gateway's own processing time is normal (2 ms p95, baseline 5 ms); its time is spent waiting on orders (mean 2656 ms vs baseline 63 ms)",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "gateway",
+     "summary": "gateway's anomaly can be explained by its downstream dependency orders",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "gateway",
+     "summary": "gateway's own processing time is normal (2 ms p95, baseline 5 ms); its time is spent waiting on orders (mean 2656 ms vs baseline 63 ms)",
+     "ts_ns": null,
+     "ref": "stat:gateway.self_p95",
+     "supports": false,
+     "weight": 3,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "notifications",
+   "fault_type": "db_pool_exhaustion",
+   "score": -4,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "notifications has no database connection pool",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "notifications",
+     "summary": "notifications is the deepest anomalous service on the call path",
+     "ts_ns": null,
+     "ref": "graph:root_candidate",
+     "supports": true,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "notifications",
+     "summary": "notifications has no database connection pool",
+     "ts_ns": null,
+     "ref": "stat:notifications.no_db",
+     "supports": false,
+     "weight": 5,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "gateway",
+   "fault_type": "crash",
+   "score": -5,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "gateway never restarted, logged nothing fatal and refused no connections",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "gateway",
+     "summary": "gateway's anomaly can be explained by its downstream dependency orders",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "gateway",
+     "summary": "gateway never restarted, logged nothing fatal and refused no connections",
+     "ts_ns": null,
+     "ref": "stat:gateway.no_crash",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "gateway",
+   "fault_type": "memory_leak",
+   "score": -5,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "gateway RSS stayed flat (peak 71 MB vs baseline 70 MB)",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "gateway",
+     "summary": "gateway's anomaly can be explained by its downstream dependency orders",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "metric",
+     "service": "gateway",
+     "summary": "gateway RSS stayed flat (peak 71 MB vs baseline 70 MB)",
+     "ts_ns": null,
+     "ref": "metric:process.memory.rss@gateway",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "gateway",
+   "fault_type": "bad_deploy",
+   "score": -5,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "no deployment event recorded for gateway near the incident",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "gateway",
+     "summary": "gateway's anomaly can be explained by its downstream dependency orders",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "gateway",
+     "summary": "no deployment event recorded for gateway near the incident",
+     "ts_ns": null,
+     "ref": "stat:gateway.no_deploy",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "orders",
+   "fault_type": "crash",
+   "score": -5,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "orders never restarted, logged nothing fatal and refused no connections",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "orders",
+     "summary": "orders's anomaly can be explained by its downstream dependency notifications",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "orders",
+     "summary": "orders never restarted, logged nothing fatal and refused no connections",
+     "ts_ns": null,
+     "ref": "stat:orders.no_crash",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "orders",
+   "fault_type": "memory_leak",
+   "score": -5,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "orders RSS stayed flat (peak 71 MB vs baseline 70 MB)",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "orders",
+     "summary": "orders's anomaly can be explained by its downstream dependency notifications",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "metric",
+     "service": "orders",
+     "summary": "orders RSS stayed flat (peak 71 MB vs baseline 70 MB)",
+     "ts_ns": null,
+     "ref": "metric:process.memory.rss@orders",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "orders",
+   "fault_type": "bad_deploy",
+   "score": -5,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "no deployment event recorded for orders near the incident",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "orders",
+     "summary": "orders's anomaly can be explained by its downstream dependency notifications",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "orders",
+     "summary": "no deployment event recorded for orders near the incident",
+     "ts_ns": null,
+     "ref": "stat:orders.no_deploy",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "gateway",
+   "fault_type": "db_pool_exhaustion",
+   "score": -6,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "gateway has no database connection pool",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "gateway",
+     "summary": "gateway's anomaly can be explained by its downstream dependency orders",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "gateway",
+     "summary": "gateway has no database connection pool",
+     "ts_ns": null,
+     "ref": "stat:gateway.no_db",
+     "supports": false,
+     "weight": 5,
+     "decisive": true
+    }
+   ]
+  },
+  {
+   "service": "orders",
+   "fault_type": "db_pool_exhaustion",
+   "score": -7,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "no pool-exhaustion errors logged by orders",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "orders",
+     "summary": "orders's anomaly can be explained by its downstream dependency notifications",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "orders",
+     "summary": "no pool-exhaustion errors logged by orders",
+     "ts_ns": null,
+     "ref": "stat:orders.pool_logs",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    },
+    {
+     "kind": "metric",
+     "service": "orders",
+     "summary": "orders pool never above 2 connections",
+     "ts_ns": null,
+     "ref": "metric:db.pool.in_use@orders",
+     "supports": false,
+     "weight": 2,
+     "decisive": false
+    }
+   ]
+  },
+  {
+   "service": "orders",
+   "fault_type": "error",
+   "score": -8,
+   "confidence": 0.0,
+   "status": "rejected",
+   "rejected_because": "orders error rate is only 0%",
+   "evidence": [
+    {
+     "kind": "graph",
+     "service": "orders",
+     "summary": "orders's anomaly can be explained by its downstream dependency notifications",
+     "ts_ns": null,
+     "ref": "graph:downstream",
+     "supports": false,
+     "weight": 1,
+     "decisive": false
+    },
+    {
+     "kind": "stat",
+     "service": "orders",
+     "summary": "orders error rate is only 0%",
+     "ts_ns": null,
+     "ref": "stat:orders.err_rate",
+     "supports": false,
+     "weight": 3,
+     "decisive": true
+    },
+    {
+     "kind": "log",
+     "service": "orders",
+     "summary": "392 of 392 error logs in orders are failed calls to notifications: the errors are propagated from notifications, not generated here",
+     "ts_ns": 1760000153199250432,
+     "ref": "log:1044",
+     "supports": false,
+     "weight": 4,
+     "decisive": true
+    }
+   ]
+  }
+ ],
+ "timeline": [
+  {
+   "ts_ns": 1760000150000000000,
+   "t_rel_s": 0.0,
+   "service": "gateway",
+   "kind": "anomaly",
+   "summary": "Isolation forest flags gateway (error_rate, p95_ms)",
+   "ref": "anomaly:gateway",
+   "on_path": true
+  },
+  {
+   "ts_ns": 1760000150000000000,
+   "t_rel_s": 0.0,
+   "service": "notifications",
+   "kind": "anomaly",
+   "summary": "Isolation forest flags notifications (p95_ms, self_p95_ms, inbound_fail, inbound_p95_ms)",
+   "ref": "anomaly:notifications",
+   "on_path": true
+  },
+  {
+   "ts_ns": 1760000150000000000,
+   "t_rel_s": 0.0,
+   "service": "orders",
+   "kind": "anomaly",
+   "summary": "Isolation forest flags orders (p95_ms, inbound_fail, inbound_p95_ms)",
+   "ref": "anomaly:orders",
+   "on_path": true
+  },
+  {
+   "ts_ns": 1760000153145686272,
+   "t_rel_s": 3.1,
+   "service": "gateway",
+   "kind": "log",
+   "summary": "Failed calls to orders: upstream call to orders failed: Read timed out. (read timeout=3) (x392)",
+   "ref": "log:2",
+   "on_path": true
+  },
+  {
+   "ts_ns": 1760000153199250432,
+   "t_rel_s": 3.2,
+   "service": "orders",
+   "kind": "log",
+   "summary": "Failed calls to notifications: upstream call to notifications failed: Read timed out. (read timeout=3) (x392)",
+   "ref": "log:1044",
+   "on_path": true
+  },
+  {
+   "ts_ns": 1760000153199250432,
+   "t_rel_s": 3.2,
+   "service": "orders",
+   "kind": "log",
+   "summary": "Degraded (best-effort call failed): order confirmed but notification failed (x392)",
+   "ref": "log:1045",
+   "on_path": true
+  }
+ ],
+ "diagnosis": {
+  "status": "supported",
+  "service": "notifications",
+  "fault_type": "latency",
+  "confidence": 1.0,
+  "score": 5,
+  "summary": "notifications: a latency fault: the service itself is slow. notifications spends 4010 ms p95 inside itself (baseline 10 ms), excluding time waiting on downstream calls; callers see notifications responses at 3000 ms p95 (baseline 12 ms).",
+  "propagation": [
+   "notifications",
+   "orders",
+   "gateway"
+  ],
+  "ruled_out": [
+   "gateway/error: 392 of 392 error logs in gateway are failed calls to orders: the errors are propagated from orders, not generated here",
+   "notifications/error: notifications error rate is only 0%",
+   "notifications/crash: notifications never restarted, logged nothing fatal and refused no connections",
+   "notifications/memory_leak: notifications RSS stayed flat (peak 71 MB vs baseline 70 MB)",
+   "notifications/bad_deploy: no deployment event recorded for notifications near the incident",
+   "orders/latency: orders's own processing time is normal (16 ms p95, baseline 16 ms); its time is spent waiting on notifications (mean 2650 ms vs baseline 9 ms)"
+  ],
+  "runner_up": null
+ },
+ "narrative": "notifications: a latency fault: the service itself is slow. notifications spends 4010 ms p95 inside itself (baseline 10 ms), excluding time waiting on downstream calls; callers see notifications responses at 3000 ms p95 (baseline 12 ms).",
+ "narrative_source": "evidence",
+ "id": "d5bff7c38bd1",
+ "investigation_seconds": 1.793,
+ "remediation": {
+  "status": "unverified",
+  "proposal": {
+   "action": "failover_dependency",
+   "service": "notifications",
+   "fault_type": "latency",
+   "description": "Fail over or scale notifications; add a timeout and circuit breaker in its callers so slowness stops propagating."
+  },
+  "sandbox": "unavailable",
+  "reason": "Docker is not available, so the fix could not be verified in a disposable environment",
+  "production": "proposed, not applied"
+ }
+}

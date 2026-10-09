@@ -25,6 +25,6 @@ def charge(body: Charge):
         )
         payment_id = cur.fetchone()[0]
     ctx.logger.info(
-        "payment captured", extra={"fields": {"event": "payment_captured", "order_id": body.order_id}}
+        "payment captured", extra={"event": "payment_captured", "order_id": body.order_id}
     )
     return {"payment_id": payment_id, "status": "captured"}

@@ -13,7 +13,8 @@ from common.base import FAULT_TYPES, make_app  # noqa: E402
 
 
 @pytest.fixture()
-def ctx():
+def ctx(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAULT_STATE_FILE", str(tmp_path / "faults.json"))
     c = make_app("testsvc")
 
     @c.app.get("/ping")
@@ -90,3 +91,39 @@ def test_scenarios_only_use_known_fault_types():
     for name, sc in inject.SCENARIOS.items():
         assert sc["type"] in FAULT_TYPES, name
         assert sc["service"] in inject.SERVICE_URLS, name
+
+
+def test_remediation_clears_matching_fault(client):
+    client.post("/admin/fault", json={"type": "bad_deploy", "params": {"version": "v9", "error_rate": 1.0}})
+    assert client.get("/ping").status_code == 500
+    out = client.post("/admin/remediate", json={"action": "rollback_deploy"}).json()
+    assert out["cleared"] == "bad_deploy"
+    assert client.get("/ping").status_code == 200
+
+
+def test_unknown_remediation_rejected(client):
+    assert client.post("/admin/remediate", json={"action": "reboot_the_internet"}).status_code == 400
+
+
+def test_log_extras_are_flat_json_fields():
+    import json
+    import logging
+
+    from common.base import JsonFormatter
+
+    rec = logging.LogRecord("t", logging.ERROR, __file__, 1, "boom", None, None)
+    rec.event = "db_pool_exhausted"
+    rec.upstream = "payments"
+    out = json.loads(JsonFormatter("svc").format(rec))
+    assert out["event"] == "db_pool_exhausted" and out["upstream"] == "payments"
+    assert out["service"] == "svc" and "fields" not in out
+
+
+def test_faults_survive_a_restart(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAULT_STATE_FILE", str(tmp_path / "faults.json"))
+    first = make_app("testsvc")
+    first.faults.apply("error", {"rate": 1.0})
+    restarted = make_app("testsvc")  # new process, same container filesystem
+    assert "error" in restarted.faults.snapshot()
+    restarted.faults.clear()
+    assert "error" not in make_app("testsvc").faults.snapshot()

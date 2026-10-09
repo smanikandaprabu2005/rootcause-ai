@@ -1,0 +1,37 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: rc, POSTGRES_PASSWORD: rc, POSTGRES_DB: rc_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rc" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ROOTCAUSE_TEST_PG: postgresql+psycopg2://rc:rc@localhost:5432/rc_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt -r services/requirements.txt httpx
+      - run: python -m pytest tests -q
+      - name: Regression benchmark (synthetic telemetry)
+        run: python -m rootcause.evaluate --mode synthetic --runs 2 --out /tmp/eval
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: dashboard } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: dashboard/package-lock.json }
+      - run: npm ci
+      - run: npm run build
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config -q
+      - run: docker compose -f docker-compose.yml -f docker-compose.sandbox.yml config -q

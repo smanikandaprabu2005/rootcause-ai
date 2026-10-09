@@ -93,3 +93,23 @@ services:
       RATE: "5"
     depends_on:
       gateway: { condition: service_healthy }
+
+  # The investigator: ingests the collector's files into Postgres, serves the API and dashboard.
+  # Open http://localhost:8000. Fix verification needs Docker, so for sandboxed remediation run
+  # `python -m rootcause serve` on the host instead (see README).
+  rootcause:
+    build:
+      context: .
+      dockerfile: Dockerfile.rootcause
+    restart: unless-stopped
+    environment:
+      ROOTCAUSE_DB: postgresql+psycopg2://shop:shop@postgres:5432/shop
+      TELEMETRY_DIR: /data/telemetry
+      ROOTCAUSE_WATCH: "1"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - ./data/telemetry:/data/telemetry:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+    ports: ["8000:8000"]

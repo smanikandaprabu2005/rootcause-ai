@@ -33,7 +33,7 @@ def reserve(body: Reserve):
     if row is None:
         ctx.logger.warning(
             "reservation rejected: item missing or out of stock",
-            extra={"fields": {"event": "reserve_rejected", "item_id": body.item_id}},
+            extra={"event": "reserve_rejected", "item_id": body.item_id},
         )
         raise HTTPException(status_code=409, detail="out of stock")
     return {"item_id": body.item_id, "qty": body.qty, "price": float(row[0])}

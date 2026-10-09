@@ -1,0 +1,23 @@
+# Overlay used by the remediation agent: a disposable second copy of the stack.
+#   docker compose -p rc-sandbox -f docker-compose.yml -f docker-compose.sandbox.yml up -d --build --wait
+# Different host ports (18xxx), no load generator, separate telemetry directory.
+services:
+  postgres:
+    ports: !override []
+  otel-collector:
+    ports: !override []
+    volumes:
+      - ./otel/collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./data/sandbox-telemetry:/data/telemetry
+  gateway:
+    ports: !override ["18080:8000"]
+  orders:
+    ports: !override ["18081:8000"]
+  inventory:
+    ports: !override ["18082:8000"]
+  payments:
+    ports: !override ["18083:8000"]
+  notifications:
+    ports: !override ["18084:8000"]
+  loadgen:
+    profiles: ["disabled"]

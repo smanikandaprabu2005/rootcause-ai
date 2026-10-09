@@ -17,5 +17,5 @@ class Notify(BaseModel):
 @app.post("/notify")
 def notify(body: Notify):
     time.sleep(random.uniform(0.003, 0.01))
-    ctx.logger.info("notification sent", extra={"fields": {"event": "notified", "order_id": body.order_id}})
+    ctx.logger.info("notification sent", extra={"event": "notified", "order_id": body.order_id})
     return {"order_id": body.order_id, "sent": True}

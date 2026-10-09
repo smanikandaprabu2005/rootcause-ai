@@ -42,7 +42,7 @@ def create_order(order: OrderIn):
     except Exception:
         ctx.logger.warning(
             "order confirmed but notification failed",
-            extra={"fields": {"event": "notify_skipped", "order_id": order_id}},
+            extra={"event": "notify_skipped", "order_id": order_id},
         )
-    ctx.logger.info("order confirmed", extra={"fields": {"event": "order_confirmed", "order_id": order_id}})
+    ctx.logger.info("order confirmed", extra={"event": "order_confirmed", "order_id": order_id})
     return {"order_id": order_id, "status": "confirmed", "amount": amount}
