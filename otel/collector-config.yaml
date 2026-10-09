@@ -1,0 +1,39 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 2s
+
+exporters:
+  # JSON-lines files are the Phase 1 hand-off; Phase 2 ingests these into storage.
+  file/traces:
+    path: /data/telemetry/traces.jsonl
+    rotation:
+      max_megabytes: 200
+  file/metrics:
+    path: /data/telemetry/metrics.jsonl
+    rotation:
+      max_megabytes: 200
+  file/logs:
+    path: /data/telemetry/logs.jsonl
+    rotation:
+      max_megabytes: 200
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/traces]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/metrics]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/logs]
