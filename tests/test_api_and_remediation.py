@@ -9,14 +9,14 @@ from rootcause import remediation, simulator
 from rootcause.api import create_app
 from rootcause.ingest import Ingestor
 from rootcause.models import NS
-from rootcause.store import Store
+from rootcause.store import open_store
 
 
 @pytest.fixture(scope="module")
 def served():
     with tempfile.TemporaryDirectory() as d:
         truth = simulator.generate("db_pool_orders", d, seed=5, rps=5.0, fault_s=90.0)
-        store = Store()
+        store = open_store()
         Ingestor(store, d).run_once()
         yield TestClient(create_app(store=store, telemetry_dir=d)), truth
 
@@ -60,7 +60,7 @@ def test_evidence_refs_resolve_to_raw_telemetry(served):
 
 
 def test_investigate_without_telemetry_is_a_clean_409():
-    client = TestClient(create_app(store=Store(), telemetry_dir=tempfile.mkdtemp()))
+    client = TestClient(create_app(store=open_store(), telemetry_dir=tempfile.mkdtemp()))
     assert client.post("/api/investigate", json={"use_llm": False}).status_code == 409
 
 

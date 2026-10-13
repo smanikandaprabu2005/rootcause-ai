@@ -3,7 +3,7 @@ x-service: &service
   mem_limit: 192m
   environment: &service-env
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    DATABASE_URL: postgresql://shop:shop@postgres:5432/shop
+    DATABASE_URL: mysql://shop:shop@mysql:3306/shop
     DB_POOL_SIZE: "5"
     UPSTREAM_TIMEOUT: "3"
   depends_on: &service-deps
@@ -16,21 +16,36 @@ x-service: &service
     retries: 10
 
 services:
-  postgres:
-    image: postgres:16-alpine
+  # Relational, transactional data for the demo shop (orders, inventory, payments).
+  mysql:
+    image: mysql:8.4
     environment:
-      POSTGRES_USER: shop
-      POSTGRES_PASSWORD: shop
-      POSTGRES_DB: shop
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: shop
+      MYSQL_USER: shop
+      MYSQL_PASSWORD: shop
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "5433:5432"
+      - "3307:3306"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ushop -pshop --silent"]
       interval: 3s
       timeout: 3s
-      retries: 20
+      retries: 30
+
+  # Document store for RootCause AI: telemetry (spans, logs, metrics) and investigation reports.
+  mongo:
+    image: mongo:7
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.108.0
@@ -61,7 +76,7 @@ services:
       NOTIFICATIONS_URL: http://notifications:8000
     depends_on:
       <<: *service-deps
-      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
     ports: ["8081:8000"]
 
   inventory:
@@ -69,7 +84,7 @@ services:
     build: { context: ./services, args: { SERVICE: inventory } }
     depends_on:
       <<: *service-deps
-      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
     ports: ["8082:8000"]
 
   payments:
@@ -77,7 +92,7 @@ services:
     build: { context: ./services, args: { SERVICE: payments } }
     depends_on:
       <<: *service-deps
-      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
     ports: ["8083:8000"]
 
   notifications:
@@ -94,7 +109,7 @@ services:
     depends_on:
       gateway: { condition: service_healthy }
 
-  # The investigator: ingests the collector's files into Postgres, serves the API and dashboard.
+  # The investigator: ingests the collector's files into MongoDB, serves the API and dashboard.
   # Open http://localhost:8000. Fix verification needs Docker, so for sandboxed remediation run
   # `python -m rootcause serve` on the host instead (see README).
   rootcause:
@@ -103,13 +118,16 @@ services:
       dockerfile: Dockerfile.rootcause
     restart: unless-stopped
     environment:
-      ROOTCAUSE_DB: postgresql+psycopg2://shop:shop@postgres:5432/shop
+      ROOTCAUSE_DB: mongodb://mongo:27017/rootcause
       TELEMETRY_DIR: /data/telemetry
       ROOTCAUSE_WATCH: "1"
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
       - ./data/telemetry:/data/telemetry:ro
     depends_on:
-      postgres: { condition: service_healthy }
+      mongo: { condition: service_healthy }
       otel-collector: { condition: service_started }
     ports: ["8000:8000"]
+
+volumes:
+  mongo-data:

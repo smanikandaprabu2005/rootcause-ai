@@ -153,23 +153,35 @@ _PIPELINE = None
 
 
 def investigate(store: Store, window: Optional[Tuple[int, int]] = None, baseline: Optional[Tuple[int, int]] = None,
-                use_llm: bool = True, save: bool = False) -> Dict[str, Any]:
-    """Run the full investigation and return the report (a JSON-serialisable dict)."""
+                use_llm: bool = True, save: bool = False, as_of_ns: Optional[int] = None) -> Dict[str, Any]:
+    """Run the full investigation and return the report (a JSON-serialisable dict).
+
+    With no ``window`` the incident is *discovered* in the telemetry (see incident.py), as of ``as_of_ns`` (default:
+    the newest telemetry). Pass a window explicitly when an alert already says when the problem started."""
     global _PIPELINE
     if _PIPELINE is None:
         _PIPELINE = build_graph()
     bounds = store.time_bounds()
     if bounds is None:
         raise ValueError("no telemetry has been ingested yet")
+    started = time.perf_counter()
+    discovery = None
     if window is None:
-        window = (max(bounds[0], bounds[1] - 90 * NS), bounds[1])
+        from .incident import find_incident
+
+        found = find_incident(store, as_of_ns)
+        window, discovery = found.window, found
+        if baseline is None:
+            baseline = found.baseline
     if baseline is None:
         baseline = (max(bounds[0], window[0] - int(settings.baseline_seconds * NS)), window[0])
-    started = time.perf_counter()
     out = _PIPELINE.invoke({"store": store, "window": window, "baseline": baseline, "use_llm": use_llm})
     report = out["report"]
     report["id"] = uuid.uuid4().hex[:12]
     report["investigation_seconds"] = round(time.perf_counter() - started, 3)
+    report["window_source"] = "discovered" if discovery else "given"
+    if discovery:
+        report["discovery"] = discovery.to_dict()
     if save:
         store.save_investigation(report["id"], report)
     return report

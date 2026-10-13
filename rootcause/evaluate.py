@@ -32,7 +32,7 @@ from .config import settings
 from .ingest import Ingestor
 from .investigator import investigate
 from .models import NS
-from .store import Store
+from .store import Store, open_store
 
 ROOT = Path(__file__).resolve().parent.parent
 RPS_CHOICES = [3.0, 5.0, 7.0]
@@ -83,7 +83,7 @@ def run_synthetic(runs: int, scenarios: List[str], with_llm_baseline: bool) -> L
             with tempfile.TemporaryDirectory() as d:
                 truth = simulator.generate(name, d, seed=1000 + i, rps=RPS_CHOICES[i % 3],
                                            fault_s=FAULT_S_CHOICES[(i // 3) % 3])
-                store = Store()
+                store = open_store()
                 Ingestor(store, d).run_once()
                 rows.append(_run_once(store, truth, with_llm_baseline))
             print(f"  {name:26} run {i + 1}/{runs}", flush=True)
@@ -91,25 +91,37 @@ def run_synthetic(runs: int, scenarios: List[str], with_llm_baseline: bool) -> L
 
 
 def run_live(runs: int, scenarios: List[str], duration: int, cooldown: int, with_llm_baseline: bool) -> List[Dict[str, Any]]:
-    """Drive the real Docker stack through faults/inject.py and score each run."""
+    """Drive a running stack (Docker Compose or ``python -m rootcause.devstack up``) through faults/inject.py
+    and score each run. ``no_fault_control`` waits the same time with nothing injected, to measure false alarms."""
     sys.path.insert(0, str(ROOT / "faults"))
     import inject  # noqa: WPS433
 
-    store = Store(settings.database_url)
+    if cooldown < settings.baseline_seconds:
+        # Each run's baseline is the baseline_seconds before its fault. A shorter cooldown puts the previous
+        # run's fault inside that baseline (a 45 s cooldown dropped live accuracy from 7/8 to 50%).
+        raise SystemExit(f"--cooldown {cooldown}s is shorter than the {settings.baseline_seconds:.0f}s baseline; "
+                         "the previous fault would contaminate the next run's baseline")
+
+    store = open_store(settings.database_url)
     ingestor = Ingestor(store, settings.telemetry_dir)
     rows = []
     for name in scenarios:
-        sc = inject.SCENARIOS[name]
+        control = name == "no_fault_control"
+        sc = None if control else inject.SCENARIOS[name]
         for i in range(runs):
-            print(f"  {name:26} run {i + 1}/{runs}: injecting for {duration}s", flush=True)
+            print(f"  {name:26} run {i + 1}/{runs}: {'observing' if control else 'injecting'} for {duration}s",
+                  flush=True)
             inject.clear()
             t_start = time.time()
-            inject.run_scenario(name, duration)
+            if control:
+                time.sleep(duration)
+            else:
+                inject.run_scenario(name, duration)
             t_end = time.time()
-            time.sleep(10)  # let the collector and metric reader flush
+            time.sleep(10)  # let the metric reader and exporters flush
             ingestor.run_once()
-            truth = {"scenario": name, "root_cause_service": sc["service"], "fault_type": sc["type"],
-                     "start": t_start, "end": t_end, "seed": i}
+            truth = {"scenario": name, "root_cause_service": None if control else sc["service"],
+                     "fault_type": None if control else sc["type"], "start": t_start, "end": t_end, "seed": i}
             rows.append(_run_once(store, truth, with_llm_baseline))
             print(f"    cooling down {cooldown}s so the next baseline is clean", flush=True)
             time.sleep(cooldown)
@@ -203,8 +215,7 @@ def main() -> None:
 
     from . import llm
 
-    names = args.scenarios or (list(simulator.SCENARIOS) if args.mode == "synthetic"
-                               else [n for n in simulator.SCENARIOS if n != "no_fault_control"])
+    names = args.scenarios or list(simulator.SCENARIOS)
     print(f"{args.mode} evaluation: {len(names)} scenarios x {args.runs} runs", flush=True)
     rows = (run_synthetic(args.runs, names, llm.available()) if args.mode == "synthetic"
             else run_live(args.runs, names, args.duration, args.cooldown, llm.available()))

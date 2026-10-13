@@ -4,7 +4,7 @@ Every service gets, from one ``make_app`` call:
   * OpenTelemetry traces, metrics and logs exported over OTLP/HTTP
   * structured JSON logs that carry trace_id / span_id
   * a runtime fault-injection API (``/admin/fault``) used by the chaos harness
-  * an optional Postgres connection pool whose exhaustion can be simulated
+  * an optional MySQL connection pool (services/common/db.py) whose exhaustion can be simulated
 """
 from __future__ import annotations
 
@@ -33,6 +33,8 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+from .db import Db, PoolExhausted
 
 FAULT_TYPES = {
     "latency",             # params: ms, jitter_ms, probability
@@ -116,7 +118,7 @@ def _rss_bytes() -> int:
     return 0
 
 
-def setup_telemetry(service: str, version: str, endpoint: Optional[str], db: "Optional[Db]") -> Resource:
+def setup_telemetry(service: str, version: str, endpoint: Optional[str], db: Optional[Db]) -> Resource:
     resource = Resource.create({"service.name": service, "service.version": version})
 
     tracer_provider = TracerProvider(resource=resource)
@@ -156,79 +158,6 @@ def setup_telemetry(service: str, version: str, endpoint: Optional[str], db: "Op
 
 
 # --------------------------------------------------------------------------- #
-# Database pool (bounded, with timeout so exhaustion is observable)
-# --------------------------------------------------------------------------- #
-class PoolExhausted(Exception):
-    pass
-
-
-class Db:
-    def __init__(self, dsn: str, maxconn: int = 5, acquire_timeout: float = 2.0):
-        import psycopg2.pool
-
-        self.maxconn = maxconn
-        self.acquire_timeout = acquire_timeout
-        self.in_use = 0
-        self._sem = threading.BoundedSemaphore(maxconn)
-        self._count_lock = threading.Lock()
-        self._release_hold = threading.Event()
-        self._pool = None
-        deadline = time.time() + 60
-        while True:  # wait for postgres to accept connections
-            try:
-                self._pool = psycopg2.pool.ThreadedConnectionPool(1, maxconn, dsn)
-                break
-            except Exception:
-                if time.time() > deadline:
-                    raise
-                time.sleep(1)
-
-    @contextmanager
-    def conn(self):
-        if not self._sem.acquire(timeout=self.acquire_timeout):
-            raise PoolExhausted(
-                f"database connection pool exhausted: waited {self.acquire_timeout}s "
-                f"for one of {self.maxconn} connections"
-            )
-        with self._count_lock:
-            self.in_use += 1
-        connection = self._pool.getconn()
-        try:
-            yield connection
-            connection.commit()
-        except Exception:
-            connection.rollback()
-            raise
-        finally:
-            self._pool.putconn(connection)
-            with self._count_lock:
-                self.in_use -= 1
-            self._sem.release()
-
-    # Fault helpers: occupy every slot, like a leak or a stuck long transaction.
-    def hold_all(self, seconds: float) -> None:
-        self._release_hold.clear()
-
-        def _hold() -> None:
-            taken = 0
-            for _ in range(self.maxconn):
-                if self._sem.acquire(timeout=30):
-                    taken += 1
-                    with self._count_lock:
-                        self.in_use += 1
-            self._release_hold.wait(timeout=seconds)
-            for _ in range(taken):
-                with self._count_lock:
-                    self.in_use -= 1
-                self._sem.release()
-
-        threading.Thread(target=_hold, daemon=True, name="db-hold").start()
-
-    def release_held(self) -> None:
-        self._release_hold.set()
-
-
-# --------------------------------------------------------------------------- #
 # Fault state
 # --------------------------------------------------------------------------- #
 class FaultState:
@@ -264,7 +193,10 @@ class FaultState:
                 saved = json.load(fh)
         except (OSError, ValueError):
             return
+        now = time.time()
         for ftype, params in saved.items():
+            if params.get("expires_at") and float(params["expires_at"]) <= now:
+                continue  # the experiment is over; a restart must not resurrect it
             try:
                 self.apply(ftype, params)
             except ValueError:
@@ -273,6 +205,10 @@ class FaultState:
     def apply(self, ftype: str, params: Dict[str, Any]) -> None:
         if ftype not in FAULT_TYPES:
             raise ValueError(f"unknown fault type '{ftype}'")
+        params = dict(params)
+        ttl = params.pop("ttl_s", None)
+        if ttl is not None:
+            params["expires_at"] = time.time() + float(ttl)   # absolute, so it survives restarts
         with self._lock:
             self._active[ftype] = {**params, "since": time.time()}
             self._requests_seen = 0
@@ -322,7 +258,15 @@ class FaultState:
         self.log.warning(f"remediation applied: {action}", extra={"event": "remediation", "action": action})
         return self.REMEDIATIONS[action]
 
+    def _purge(self) -> None:
+        now = time.time()
+        with self._lock:
+            expired = [k for k, v in self._active.items() if v.get("expires_at") and v["expires_at"] <= now]
+        for k in expired:
+            self.clear(k)
+
     def snapshot(self) -> Dict[str, Dict[str, Any]]:
+        self._purge()
         with self._lock:
             return {k: dict(v) for k, v in self._active.items()}
 

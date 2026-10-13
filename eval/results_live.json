@@ -1,0 +1,627 @@
+{
+ "summary": {
+  "runs": 18,
+  "fault_runs": 16,
+  "control_runs": 2,
+  "rootcause": {
+   "top1_service_accuracy": 1.0,
+   "top1_strict_accuracy": 1.0,
+   "false_diagnosis_rate": 0.0,
+   "committed_runs": 16,
+   "investigation_seconds_median": 2.53,
+   "investigation_seconds_p95": 3.12,
+   "detection_delay_s_median": 0.0,
+   "false_alarm_rate": 0.0
+  },
+  "error_count": {
+   "top1_service_accuracy": 0.5,
+   "top1_strict_accuracy": 0.125,
+   "false_diagnosis_rate": 0.8571428571428571,
+   "committed_runs": 14,
+   "seconds_median": 0.01,
+   "false_alarm_rate": 0.0
+  },
+  "by_scenario": {
+   "latency_payments": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 0
+   },
+   "crash_inventory": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 0
+   },
+   "db_pool_orders": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 0
+   },
+   "memory_leak_payments": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 0
+   },
+   "bad_deploy_orders": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 0
+   },
+   "error_burst_inventory": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 2
+   },
+   "slow_notifications_trap": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 0
+   },
+   "db_pool_payments": {
+    "n": 2,
+    "rootcause": 2,
+    "error_count": 0
+   }
+  }
+ },
+ "runs": [
+  {
+   "scenario": "latency_payments",
+   "seed": 0,
+   "truth": [
+    "payments",
+    "latency"
+   ],
+   "rootcause": {
+    "pred": [
+     "payments",
+     "latency"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 2.352,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": false,
+    "false_alarm": false,
+    "seconds": 0.006
+   }
+  },
+  {
+   "scenario": "latency_payments",
+   "seed": 1,
+   "truth": [
+    "payments",
+    "latency"
+   ],
+   "rootcause": {
+    "pred": [
+     "payments",
+     "latency"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 2.34,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": false,
+    "false_alarm": false,
+    "seconds": 0.003
+   }
+  },
+  {
+   "scenario": "crash_inventory",
+   "seed": 0,
+   "truth": [
+    "inventory",
+    "crash"
+   ],
+   "rootcause": {
+    "pred": [
+     "inventory",
+     "crash"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 2.742,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.014
+   }
+  },
+  {
+   "scenario": "crash_inventory",
+   "seed": 1,
+   "truth": [
+    "inventory",
+    "crash"
+   ],
+   "rootcause": {
+    "pred": [
+     "inventory",
+     "crash"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 2.573,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.011
+   }
+  },
+  {
+   "scenario": "db_pool_orders",
+   "seed": 0,
+   "truth": [
+    "orders",
+    "db_pool_exhaustion"
+   ],
+   "rootcause": {
+    "pred": [
+     "orders",
+     "db_pool_exhaustion"
+    ],
+    "status": "supported",
+    "confidence": 0.949,
+    "investigation_seconds": 2.347,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.003
+   }
+  },
+  {
+   "scenario": "db_pool_orders",
+   "seed": 1,
+   "truth": [
+    "orders",
+    "db_pool_exhaustion"
+   ],
+   "rootcause": {
+    "pred": [
+     "orders",
+     "db_pool_exhaustion"
+    ],
+    "status": "supported",
+    "confidence": 0.949,
+    "investigation_seconds": 2.144,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.003
+   }
+  },
+  {
+   "scenario": "memory_leak_payments",
+   "seed": 0,
+   "truth": [
+    "payments",
+    "memory_leak"
+   ],
+   "rootcause": {
+    "pred": [
+     "payments",
+     "memory_leak"
+    ],
+    "status": "supported",
+    "confidence": 0.966,
+    "investigation_seconds": 3.122,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.01
+   }
+  },
+  {
+   "scenario": "memory_leak_payments",
+   "seed": 1,
+   "truth": [
+    "payments",
+    "memory_leak"
+   ],
+   "rootcause": {
+    "pred": [
+     "payments",
+     "memory_leak"
+    ],
+    "status": "supported",
+    "confidence": 0.966,
+    "investigation_seconds": 2.585,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.016
+   }
+  },
+  {
+   "scenario": "bad_deploy_orders",
+   "seed": 0,
+   "truth": [
+    "orders",
+    "bad_deploy"
+   ],
+   "rootcause": {
+    "pred": [
+     "orders",
+     "bad_deploy"
+    ],
+    "status": "supported",
+    "confidence": 0.982,
+    "investigation_seconds": 2.527,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.009
+   }
+  },
+  {
+   "scenario": "bad_deploy_orders",
+   "seed": 1,
+   "truth": [
+    "orders",
+    "bad_deploy"
+   ],
+   "rootcause": {
+    "pred": [
+     "orders",
+     "bad_deploy"
+    ],
+    "status": "supported",
+    "confidence": 0.982,
+    "investigation_seconds": 2.516,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.01
+   }
+  },
+  {
+   "scenario": "error_burst_inventory",
+   "seed": 0,
+   "truth": [
+    "inventory",
+    "error"
+   ],
+   "rootcause": {
+    "pred": [
+     "inventory",
+     "error"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 2.396,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.012
+   }
+  },
+  {
+   "scenario": "error_burst_inventory",
+   "seed": 1,
+   "truth": [
+    "inventory",
+    "error"
+   ],
+   "rootcause": {
+    "pred": [
+     "inventory",
+     "error"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 3.176,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.02
+   }
+  },
+  {
+   "scenario": "slow_notifications_trap",
+   "seed": 0,
+   "truth": [
+    "notifications",
+    "latency"
+   ],
+   "rootcause": {
+    "pred": [
+     "notifications",
+     "latency"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 2.619,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.006
+   }
+  },
+  {
+   "scenario": "slow_notifications_trap",
+   "seed": 1,
+   "truth": [
+    "notifications",
+    "latency"
+   ],
+   "rootcause": {
+    "pred": [
+     "notifications",
+     "latency"
+    ],
+    "status": "supported",
+    "confidence": 1.0,
+    "investigation_seconds": 2.689,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": false,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.005
+   }
+  },
+  {
+   "scenario": "db_pool_payments",
+   "seed": 0,
+   "truth": [
+    "payments",
+    "db_pool_exhaustion"
+   ],
+   "rootcause": {
+    "pred": [
+     "payments",
+     "db_pool_exhaustion"
+    ],
+    "status": "supported",
+    "confidence": 0.949,
+    "investigation_seconds": 2.46,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.003
+   }
+  },
+  {
+   "scenario": "db_pool_payments",
+   "seed": 1,
+   "truth": [
+    "payments",
+    "db_pool_exhaustion"
+   ],
+   "rootcause": {
+    "pred": [
+     "payments",
+     "db_pool_exhaustion"
+    ],
+    "status": "supported",
+    "confidence": 0.949,
+    "investigation_seconds": 2.536,
+    "detection_delay_s": 0.0,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": true,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": false,
+    "committed": true,
+    "false_alarm": false,
+    "seconds": 0.005
+   }
+  },
+  {
+   "scenario": "no_fault_control",
+   "seed": 0,
+   "truth": [
+    null,
+    null
+   ],
+   "rootcause": {
+    "pred": [
+     null,
+     null
+    ],
+    "status": "no_incident",
+    "confidence": 0.0,
+    "investigation_seconds": 2.643,
+    "detection_delay_s": null,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": false,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": false,
+    "false_alarm": false,
+    "seconds": 0.01
+   }
+  },
+  {
+   "scenario": "no_fault_control",
+   "seed": 1,
+   "truth": [
+    null,
+    null
+   ],
+   "rootcause": {
+    "pred": [
+     null,
+     null
+    ],
+    "status": "no_incident",
+    "confidence": 0.0,
+    "investigation_seconds": 2.714,
+    "detection_delay_s": null,
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": false,
+    "false_alarm": false
+   },
+   "error_count": {
+    "skipped": false,
+    "service_correct": true,
+    "strict_correct": true,
+    "committed": false,
+    "false_alarm": false,
+    "seconds": 0.014
+   }
+  }
+ ]
+}

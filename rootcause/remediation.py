@@ -9,6 +9,7 @@ and the production action stays a human decision.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import statistics
 import subprocess
@@ -118,6 +119,37 @@ class DockerComposeSandbox:
         return {"error_rate": failed / self.n, "p95_ms": lat[int(0.95 * (len(lat) - 1))]}
 
 
+class NativeSandbox(DockerComposeSandbox):
+    """The same disposable-copy idea without containers: a second set of the real demo services as local
+    processes (ports 18080+, its own temp directory, database and telemetry), torn down afterwards.
+
+    Isolation is process-level rather than container-level, but it is the real services with the real fault
+    injection, so "the failure went away" is measured, not assumed."""
+
+    def __init__(self, requests_per_measure: int = 60, rps: float = 12.0):
+        self.project, self.n, self.rps = "native", requests_per_measure, rps
+        self._stack = None
+
+    @staticmethod
+    def available() -> bool:
+        try:
+            import opentelemetry.sdk  # noqa: F401
+            import uvicorn  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def start(self) -> None:
+        from .devstack import DevStack
+
+        self._stack = DevStack(offset=10000, loadgen=False, quiet=True).start()
+
+    def stop(self) -> None:
+        if self._stack is not None:
+            self._stack.stop()
+            self._stack = None
+
+
 def verify(proposal: Dict[str, str], sandbox: Sandbox) -> Dict[str, Any]:
     """Reproduce the fault, apply the fix, and check that service health recovers."""
     steps: List[str] = []
@@ -156,6 +188,16 @@ def verify(proposal: Dict[str, str], sandbox: Sandbox) -> Dict[str, Any]:
             pass
 
 
+def pick_sandbox() -> Optional[Sandbox]:
+    """ROOTCAUSE_SANDBOX=docker|native|auto (default): prefer containers, fall back to local processes."""
+    choice = os.getenv("ROOTCAUSE_SANDBOX", "auto").lower()
+    if choice in ("auto", "docker") and DockerComposeSandbox.available():
+        return DockerComposeSandbox()
+    if choice in ("auto", "native") and NativeSandbox.available():
+        return NativeSandbox()
+    return None
+
+
 def plan_and_verify(report: Dict[str, Any], sandbox: Optional[Sandbox] = None) -> Dict[str, Any]:
     proposal = propose(report["diagnosis"])
     if proposal is None:
@@ -164,11 +206,12 @@ def plan_and_verify(report: Dict[str, Any], sandbox: Optional[Sandbox] = None) -
         return {"status": "no_action", "proposal": proposal,
                 "reason": "diagnosis is inconclusive, so no fix is proposed for execution"}
     if sandbox is None:
-        if not DockerComposeSandbox.available():
+        sandbox = pick_sandbox()
+        if sandbox is None:
             return {"status": "unverified", "proposal": proposal, "sandbox": "unavailable",
-                    "reason": "Docker is not available, so the fix could not be verified in a disposable environment",
+                    "reason": "neither Docker nor the local demo-service dependencies are available, so the fix "
+                              "could not be verified in a disposable environment",
                     "production": "proposed, not applied"}
-        sandbox = DockerComposeSandbox()
     result = verify(proposal, sandbox)
     return {"status": "verified" if result["verified"] else "failed" if result["verified"] is False else "unverified",
             "proposal": proposal, "sandbox": type(sandbox).__name__, "verification": result,

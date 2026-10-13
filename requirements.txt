@@ -2,7 +2,7 @@
 fastapi>=0.115,<1
 uvicorn[standard]>=0.30
 sqlalchemy>=2.0,<3
-psycopg2-binary>=2.9.10
+pymongo>=4.7
 numpy>=1.26
 scikit-learn>=1.4
 langgraph>=0.2
@@ -10,3 +10,5 @@ pydantic>=2.7
 httpx>=0.27
 google-genai>=0.3   # optional: Gemini narration / LLM baseline (needs GEMINI_API_KEY)
 pytest>=8
+mongomock>=4.1   # tests: in-memory MongoDB
+sqlglot>=25      # tests: validates the shop SQL against the MySQL dialect

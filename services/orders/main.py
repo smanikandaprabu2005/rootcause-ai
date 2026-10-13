@@ -23,10 +23,10 @@ def create_order(order: OrderIn):
     # Short transactions on purpose: no connection is held across upstream calls.
     with ctx.db.conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO orders (item_id, qty, status) VALUES (%s, %s, 'pending') RETURNING id",
+            "INSERT INTO orders (item_id, qty, status) VALUES (%s, %s, 'pending')",
             (order.item_id, order.qty),
         )
-        order_id = cur.fetchone()[0]
+        order_id = cur.lastrowid
 
     reserved = ctx.upstream(
         "inventory", "POST", f"{INVENTORY_URL}/reserve", json={"item_id": order.item_id, "qty": order.qty}

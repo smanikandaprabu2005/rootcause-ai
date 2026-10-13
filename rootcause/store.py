@@ -1,9 +1,16 @@
-"""Telemetry storage. PostgreSQL in production, SQLite for tests and local runs."""
+"""Telemetry storage behind one interface (``Store``).
+
+* ``MongoStore`` (rootcause/mongo_store.py): production. Spans, logs and metrics are variable-shape documents and
+  investigation reports are nested JSON, which is what a document database is for.
+* ``SqlStore``: embedded SQLite, zero configuration, used for tests, the offline benchmark and Docker-free runs.
+
+Pick one with ``open_store(url)``: ``mongodb://...`` or ``sqlite:///file.db`` (``sqlite://`` is in-memory).
+"""
 from __future__ import annotations
 
 import json
 import time
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence
 
 from sqlalchemy import (
     JSON, BigInteger, Column, Float, Index, Integer, MetaData, String, Table, Text, create_engine, func, insert, select,
@@ -59,15 +66,49 @@ def _chunks(rows: Sequence[dict], n: int = _BATCH) -> Iterable[Sequence[dict]]:
         yield rows[i : i + n]
 
 
-class Store:
+class Store(Protocol):
+    """What the investigator, ingestor and API need from storage."""
+
+    def add_spans(self, spans: Sequence[Span]) -> None: ...
+    def add_logs(self, logs: Sequence[LogRec]) -> None: ...
+    def add_metrics(self, points: Sequence[MetricPoint]) -> None: ...
+    def get_offset(self, source: str) -> int: ...
+    def set_offset(self, source: str, offset: int) -> None: ...
+    def spans(self, start_ns: int, end_ns: int, service: Optional[str] = None) -> List[Span]: ...
+    def logs(self, start_ns: int, end_ns: int, service: Optional[str] = None) -> List[LogRec]: ...
+    def metrics(self, start_ns: int, end_ns: int, service: Optional[str] = None,
+                name: Optional[str] = None) -> List[MetricPoint]: ...
+    def get_log(self, log_id: int) -> Optional[LogRec]: ...
+    def get_trace(self, trace_id: str) -> List[Span]: ...
+    def time_bounds(self) -> Optional[tuple]: ...
+    def services(self) -> List[str]: ...
+    def counts(self) -> Dict[str, int]: ...
+    def save_investigation(self, inv_id: str, report: Dict[str, Any]) -> None: ...
+    def get_investigation(self, inv_id: str) -> Optional[Dict[str, Any]]: ...
+    def list_investigations(self, limit: int = 50) -> List[Dict[str, Any]]: ...
+
+
+def open_store(url: str = "sqlite://") -> Store:
+    """``mongodb://host:27017/rootcause`` -> MongoStore; ``sqlite://`` or ``sqlite:///path`` -> SqlStore."""
+    if url.startswith(("mongodb://", "mongodb+srv://")):
+        from .mongo_store import MongoStore
+
+        return MongoStore(url)
+    if url.startswith("sqlite"):
+        return SqlStore(url)
+    raise ValueError(f"unsupported store URL {url.split('://')[0]}://; use mongodb:// or sqlite://")
+
+
+class SqlStore:
+    """Embedded SQLite implementation of ``Store``."""
+
     def __init__(self, url: str = "sqlite://"):
-        if url.startswith("sqlite"):
-            kw: Dict[str, Any] = {"connect_args": {"check_same_thread": False}}
-            if url in ("sqlite://", "sqlite:///:memory:"):
-                kw["poolclass"] = StaticPool  # one shared in-memory database
-            self.engine: Engine = create_engine(url, **kw)
-        else:
-            self.engine = create_engine(url, pool_pre_ping=True)
+        if not url.startswith("sqlite"):
+            raise ValueError("SqlStore only supports sqlite URLs")
+        kw: Dict[str, Any] = {"connect_args": {"check_same_thread": False}}
+        if url in ("sqlite://", "sqlite:///:memory:"):
+            kw["poolclass"] = StaticPool  # one shared in-memory database
+        self.engine: Engine = create_engine(url, **kw)
         metadata.create_all(self.engine)
 
     # ---- writes -------------------------------------------------------------

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict
 
 from .otlp import parse_line
-from .store import Store
+from .store import Store, open_store
 
 log = logging.getLogger("rootcause.ingest")
 SOURCES = ("traces", "metrics", "logs")
@@ -79,7 +79,7 @@ def main() -> None:
     parser.add_argument("--watch", action="store_true", help="keep running and ingest new data")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
-    ing = Ingestor(Store(args.db), args.dir)
+    ing = Ingestor(open_store(args.db), args.dir)
     if args.watch:
         ing.watch()
     else:

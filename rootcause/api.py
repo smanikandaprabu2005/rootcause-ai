@@ -18,7 +18,7 @@ from .graph import build_graph
 from .ingest import Ingestor
 from .investigator import investigate
 from .models import NS
-from .store import Store
+from .store import Store, open_store
 
 
 class InvestigateRequest(BaseModel):
@@ -31,7 +31,7 @@ class InvestigateRequest(BaseModel):
 
 def create_app(store: Optional[Store] = None, telemetry_dir: Optional[str] = None,
                sandbox: Any = None) -> FastAPI:
-    store = store or Store(settings.database_url)
+    store = store or open_store(settings.database_url)
     ingestor = Ingestor(store, telemetry_dir or settings.telemetry_dir)
     app = FastAPI(title="RootCause AI", version="1.0")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

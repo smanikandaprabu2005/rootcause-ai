@@ -15,7 +15,7 @@ import warnings
 from .config import settings
 from .ingest import Ingestor
 from .models import NS
-from .store import Store
+from .store import open_store
 
 
 def main(argv=None) -> int:
@@ -27,7 +27,8 @@ def main(argv=None) -> int:
     p = sub.add_parser("ingest")
     p.add_argument("--watch", action="store_true")
     p = sub.add_parser("investigate")
-    p.add_argument("--last", type=float, default=90.0, help="investigate the last N seconds of telemetry")
+    p.add_argument("--last", type=float, default=None,
+                   help="investigate the last N seconds (default: find the incident automatically)")
     p.add_argument("--no-llm", action="store_true")
     p.add_argument("--remediate", action="store_true", help="also verify a fix in a disposable sandbox")
     p.add_argument("--json", action="store_true", help="print the full JSON report")
@@ -51,7 +52,7 @@ def main(argv=None) -> int:
         uvicorn.run("rootcause.api:get_app", factory=True, host=args.host, port=args.port)
         return 0
 
-    store = Store(settings.database_url)
+    store = open_store(settings.database_url)
     ingestor = Ingestor(store, settings.telemetry_dir)
     if args.cmd == "ingest":
         if args.watch:
@@ -68,7 +69,7 @@ def main(argv=None) -> int:
     if bounds is None:
         print("no telemetry found; is the stack running and TELEMETRY_DIR correct?", file=sys.stderr)
         return 1
-    window = (max(bounds[0], bounds[1] - int(args.last * NS)), bounds[1])
+    window = (max(bounds[0], bounds[1] - int(args.last * NS)), bounds[1]) if args.last else None
     report = investigate(store, window, use_llm=not args.no_llm, save=True)
     if args.remediate:
         report["remediation"] = plan_and_verify(report)

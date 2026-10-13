@@ -84,20 +84,27 @@ def inject(service: str, ftype: str, params: dict) -> None:
     print(f"injected {ftype} into {service}: {json.dumps(out['active'])}")
 
 
-def clear(service: str | None = None) -> None:
+def clear(service: str | None = None, wait_s: float = 90.0) -> None:
+    """Clear faults, retrying while a crashed service is in restart backoff (the fault's TTL is the backstop)."""
     for name in [service] if service else SERVICE_URLS:
-        try:
-            _request("DELETE", f"{SERVICE_URLS[name]}/admin/fault")
-            print(f"cleared faults on {name}")
-        except SystemExit as exc:  # a crashed service may be mid-restart
-            print(f"warning: {exc}")
+        deadline = time.time() + wait_s
+        while True:
+            try:
+                _request("DELETE", f"{SERVICE_URLS[name]}/admin/fault", timeout=3.0)
+                print(f"cleared faults on {name}")
+                break
+            except SystemExit as exc:  # a crashed service may be mid-restart
+                if time.time() >= deadline:
+                    print(f"warning: {exc} (the fault will expire on its own)")
+                    break
+                time.sleep(2)
 
 
 def run_scenario(name: str, duration: int) -> None:
     sc = SCENARIOS[name]
     run_id = uuid.uuid4().hex[:8]
     start = datetime.now(timezone.utc)
-    inject(sc["service"], sc["type"], sc["params"])
+    inject(sc["service"], sc["type"], {**sc["params"], "ttl_s": duration + 15})
     try:
         print(f"[{run_id}] fault active for {duration}s: {sc['description']}")
         time.sleep(duration)

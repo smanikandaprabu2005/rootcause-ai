@@ -1,4 +1,4 @@
-"""Stock levels and reservations backed by Postgres."""
+"""Stock levels and reservations backed by MySQL."""
 from fastapi import HTTPException
 from pydantic import BaseModel
 
@@ -26,10 +26,13 @@ def items():
 def reserve(body: Reserve):
     with ctx.db.conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "UPDATE items SET stock = stock - %s WHERE id = %s AND stock >= %s RETURNING price",
+            "UPDATE items SET stock = stock - %s WHERE id = %s AND stock >= %s",
             (body.qty, body.item_id, body.qty),
         )
-        row = cur.fetchone()
+        row = None
+        if cur.rowcount:  # the row matched and had enough stock; read its price in the same transaction
+            cur.execute("SELECT price FROM items WHERE id = %s", (body.item_id,))
+            row = cur.fetchone()
     if row is None:
         ctx.logger.warning(
             "reservation rejected: item missing or out of stock",

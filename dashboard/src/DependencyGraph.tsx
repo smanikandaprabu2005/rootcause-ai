@@ -189,7 +189,8 @@ export default function DependencyGraph({ report }: { report: Report }) {
         <p className="muted">No service graph in this report.</p>
       ) : (
         <>
-          <div className="graph-scroll">
+          <p className="graph-hint" aria-hidden="true">Swipe sideways to see the whole graph →</p>
+          <div className="graph-scroll" tabIndex={0} role="region" aria-label="Dependency graph (scrolls sideways on narrow screens)">
             <svg
               className="graph"
               viewBox={`0 0 ${L.width} ${L.height}`}
@@ -199,7 +200,7 @@ export default function DependencyGraph({ report }: { report: Report }) {
             >
               <defs>
                 {(["err", "warn", "ok"] as const).map((t) => (
-                  <marker key={t} id={`arrow-${t}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <marker key={t} id={`arrow-${t}`} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse">
                     <path d="M0,0 L10,5 L0,10 z" className={`arrow arrow-${t}`} />
                   </marker>
                 ))}

@@ -29,6 +29,7 @@ _GUARDS = {
     "inbound_p95_ms": dict(floor=5.0,  min_delta=100.0, mode="rise", ratio=2.0),
 }
 _MIN_BASELINE_BUCKETS = 8
+_MIN_ANOMALOUS_BUCKETS = 2
 
 
 @dataclass
@@ -94,10 +95,17 @@ def detect(spans: Sequence[Span], metrics: Sequence[MetricPoint], baseline: tupl
         for b in range(win.shape[0]):
             if win[b, 0] == 0 and win[b, 6] == 0 and win[b, 4] == 0:
                 continue  # no data at all for this bucket
-            if scores[b] >= threshold:
-                continue
             flags = _guard_flags(base, win[b])
             if not flags:
+                continue
+            # The forest gates ordinary-looking buckets. A bucket that clears a feature's guard AND lies beyond
+            # everything the baseline ever showed (by the guard's minimum change) is accepted regardless:
+            # real baselines contain their own blips (e.g. 25% errors in a few buckets), which make the
+            # 2nd-percentile forest threshold so low that a sustained 50% error rate is not "rare" enough.
+            beyond = any(
+                (FEATURES[j] != "requests") and win[b, j] > base[:, j].max() + _GUARDS[FEATURES[j]]["min_delta"]
+                for j in flags)
+            if scores[b] >= threshold and not beyond:
                 continue
             bad.append(b)
             for j in flags:
@@ -107,7 +115,9 @@ def detect(spans: Sequence[Span], metrics: Sequence[MetricPoint], baseline: tupl
                 if prev is not None and feat != "requests":
                     worst = max(prev, worst)
                 deviating[feat] = {"baseline": round(float(mu[j]), 3), "worst": round(float(worst), 3)}
-        if bad:
+        # One odd bucket is noise (e.g. a partial bucket where the window is cut, which a live control run
+        # produced); an incident is sustained. Two consecutive-ish buckets is the minimum.
+        if len(bad) >= _MIN_ANOMALOUS_BUCKETS:
             results.append(ServiceAnomaly(
                 service=svc, onset_ns=int(window[0] + bad[0] * bucket_ns), anomalous_buckets=len(bad),
                 total_buckets=int(win.shape[0]), severity=float(-min(scores[b] for b in bad)), deviating=deviating,

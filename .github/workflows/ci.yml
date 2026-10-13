@@ -1,25 +1,41 @@
 name: CI
 on: [push, pull_request]
+
 jobs:
   python:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:16-alpine
-        env: { POSTGRES_USER: rc, POSTGRES_PASSWORD: rc, POSTGRES_DB: rc_test }
-        ports: ["5432:5432"]
+      mongo:
+        image: mongo:7
+        ports: ["27017:27017"]
         options: >-
-          --health-cmd "pg_isready -U rc" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: shop
+          MYSQL_USER: shop
+          MYSQL_PASSWORD: shop
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      ROOTCAUSE_TEST_PG: postgresql+psycopg2://rc:rc@localhost:5432/rc_test
+      ROOTCAUSE_TEST_MONGO: mongodb://localhost:27017/rc_test   # storage contract tests also run on a real MongoDB
+      SHOP_TEST_MYSQL: mysql://shop:shop@127.0.0.1:3306/shop    # shop SQL runs through the real PyMySQL pool
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install -r requirements.txt -r services/requirements.txt httpx
+      - run: pip install -r requirements.txt -r services/requirements.txt
+      - name: Make the demo service names resolve (the stack tests use the same peer names as Compose)
+        run: echo "127.0.0.1 gateway orders inventory payments notifications" | sudo tee -a /etc/hosts
       - run: python -m pytest tests -q
-      - name: Regression benchmark (synthetic telemetry)
+      - name: Regression benchmark on simulated telemetry
         run: python -m rootcause.evaluate --mode synthetic --runs 2 --out /tmp/eval
+
   dashboard:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: dashboard } }
@@ -29,9 +45,15 @@ jobs:
         with: { node-version: 20, cache: npm, cache-dependency-path: dashboard/package-lock.json }
       - run: npm ci
       - run: npm run build
+
   compose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: docker compose config -q
       - run: docker compose -f docker-compose.yml -f docker-compose.sandbox.yml config -q
+      - name: The sandbox must contain only the shop (no investigator, MongoDB or load generator)
+        run: |
+          services=$(docker compose -f docker-compose.yml -f docker-compose.sandbox.yml config --services | sort | tr '\n' ' ')
+          echo "$services"
+          test "$services" = "gateway inventory mysql notifications orders otel-collector payments "

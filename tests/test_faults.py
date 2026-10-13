@@ -127,3 +127,20 @@ def test_faults_survive_a_restart(tmp_path, monkeypatch):
     assert "error" in restarted.faults.snapshot()
     restarted.faults.clear()
     assert "error" not in make_app("testsvc").faults.snapshot()
+
+
+def test_fault_ttl_expires_and_is_not_resurrected_by_restart(tmp_path):
+    import logging, time
+    from services.common.base import FaultState
+
+    f = tmp_path / "faults.json"
+    fs = FaultState("svc", "v1", None, logging.getLogger("t"), state_file=str(f))
+    fs.apply("error", {"rate": 1.0, "ttl_s": 0.2})
+    assert "error" in fs.snapshot() and "ttl_s" not in fs.snapshot()["error"]
+    time.sleep(0.3)
+    assert fs.snapshot() == {}
+    # a fault written to disk that already expired is dropped on restore
+    f.write_text('{"crash": {"expires_at": 1}}')
+    fs2 = FaultState("svc", "v1", None, logging.getLogger("t"), state_file=str(f))
+    fs2.restore()
+    assert fs2.snapshot() == {}

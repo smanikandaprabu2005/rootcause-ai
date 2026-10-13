@@ -1,8 +1,9 @@
-# Overlay used by the remediation agent: a disposable second copy of the stack.
+# Overlay used by the remediation agent: a disposable second copy of the *shop* (not of RootCause AI).
 #   docker compose -p rc-sandbox -f docker-compose.yml -f docker-compose.sandbox.yml up -d --build --wait
-# Different host ports (18xxx), no load generator, separate telemetry directory.
+# Different host ports (18xxx), separate telemetry directory, and the investigator, its MongoDB and the
+# load generator are switched off so the sandbox cannot collide with the real stack on ports or data.
 services:
-  postgres:
+  mysql:
     ports: !override []
   otel-collector:
     ports: !override []
@@ -20,4 +21,8 @@ services:
   notifications:
     ports: !override ["18084:8000"]
   loadgen:
+    profiles: ["disabled"]
+  rootcause:
+    profiles: ["disabled"]
+  mongo:
     profiles: ["disabled"]

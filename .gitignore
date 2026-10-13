@@ -11,3 +11,4 @@ dashboard/dist/
 rootcause.db
 data/sandbox-telemetry/
 .venv-*/
+data/devstack/

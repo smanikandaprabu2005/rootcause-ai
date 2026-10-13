@@ -1,4 +1,4 @@
-"""Payment capture (simulated processor + a Postgres ledger)."""
+"""Payment capture (simulated processor + a MySQL ledger)."""
 import random
 import time
 
@@ -20,10 +20,10 @@ def charge(body: Charge):
     time.sleep(random.uniform(0.005, 0.02))  # simulated processor round-trip
     with ctx.db.conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO payments (order_id, amount, status) VALUES (%s, %s, 'captured') RETURNING id",
+            "INSERT INTO payments (order_id, amount, status) VALUES (%s, %s, 'captured')",
             (body.order_id, body.amount),
         )
-        payment_id = cur.fetchone()[0]
+        payment_id = cur.lastrowid
     ctx.logger.info(
         "payment captured", extra={"event": "payment_captured", "order_id": body.order_id}
     )
