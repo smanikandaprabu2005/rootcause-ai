@@ -88,11 +88,13 @@ Median 2.5 s per diagnosis. **How much to trust this:** the sample is small (18 
 
 ## Limitations
 
-- **Not run in the authoring environment:** real MySQL, real MongoDB and `docker compose up` end to end. They are exercised by CI (service containers) and need a first run on your machine. The live numbers above come from the Docker-free stack with SQLite, not Compose.
+- **Not run end to end:** `docker compose up` (CI only validates the compose files). Real MySQL 8.4 and MongoDB 7 are exercised by CI service containers and passed. The live numbers above come from the Docker-free stack with SQLite, not Compose.
 - The live detector was tuned once after the first live pass (one missed scenario, fixed). The final run is a fresh set of injections, but the scenarios, thresholds and author are the same. It measures these 8 faults, not production incidents in general.
 - Fault types are the six the demo can inject. An unfamiliar failure mode yields `inconclusive` rather than a guess, by design.
 - The sandbox verifies the playbook action against the demo's fault-injection hooks; a real system would need its own reproduce-and-fix step.
 - Single-fault incidents only. Concurrent unrelated faults are not handled.
+
+See [docs/FLOW.md](docs/FLOW.md) for the full flow diagram and a 3-minute demo script.
 
 ## Layout
 
